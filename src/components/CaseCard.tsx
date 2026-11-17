@@ -1,4 +1,5 @@
 import type { CaseData } from "../types";
+import { poolSize } from "../lib/pool";
 
 interface Props {
   caseData: CaseData;
@@ -46,11 +47,13 @@ export default function CaseCard({ caseData, index, onClick }: Props) {
         </div>
         <div className="case-meta-item">
           <span className="meta-label">嫌疑人</span>
-          <span className="meta-value">{caseData.suspects.length} 人</span>
+          <span className="meta-value">
+            {caseData.suspects.length} 人 · 每种设局卡池 {poolSize(caseData)} 张
+          </span>
         </div>
       </div>
 
-      <span className="case-enter">进入调查</span>
+      <span className="case-enter">开始出题</span>
     </button>
   );
 }

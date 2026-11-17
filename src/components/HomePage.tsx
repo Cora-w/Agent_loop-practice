@@ -26,13 +26,13 @@ export default function HomePage({ apiConfig, onSelectCase, onOpenApi }: Props) 
       </header>
 
       <section className="hero">
-        <p className="hero-kicker">AGENT LOOP · 观察 / 决策 / 行动 / 评估</p>
+        <p className="hero-kicker">出题人模式 · AGENT LOOP</p>
         <h1 className="hero-title">
-          AI 侦探<span className="hero-title-accent">推理档案</span>
+          设局<span className="hero-title-accent">考 AI 侦探</span>
         </h1>
         <p className="hero-desc">
-          你是侦探长，AI 是你的搭档。它按「观察、决策、行动、评估」的循环自主搜证；
-          你随时追问嫌疑人、出示物证逼出破绽、在线索板上标记矛盾。行动点有限，最后由你亲自指认真凶，按表现评级。
+          你来出题：指定一个凶手，从卡池里挑选证据和剧情交给 AI，还可以故意混进干扰线索。
+          AI 侦探按「观察、决策、行动、评估」的循环一步步推理并指认凶手，看它能不能识破你设的局。
         </p>
       </section>
 

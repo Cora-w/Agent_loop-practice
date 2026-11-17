@@ -5,7 +5,7 @@ interface Props {
   phase: LoopPhase;
   step: number;
   running: boolean;
-  paused: boolean;
+  paused?: boolean;
   completed: boolean;
 }
 

@@ -1,13 +1,11 @@
 import type { Action, AgentContext, ApiConfig, CaseData, ModelResponse } from "../types";
-import { AP_COST, TOOL_DEFINITIONS, toolResultToText } from "./tools";
+import { TOOL_DEFINITIONS, toolResultToText } from "./tools";
 
 export const SYSTEM_PROMPT =
-  "你是一名资深刑侦侦探。工作方式：1.getCaseOverview 2.interrogateWitness逐个审问 3.examineEvidence检查物证 4.crossCheckStatements交叉比对 5.reviewClues回顾 6.recommendAccusation提交指认建议。规则：每次只调一个工具，基于证据推理，注意证词矛盾，指认时给出完整推理链条：动机+机会+证据+排除其他人。\n\n" +
-  "你和侦探长（用户）搭档办案：\n" +
-  "- 嫌疑人由真人般的角色扮演回答，可能说谎、隐瞒。\n" +
-  "- 只有侦探长能向嫌疑人出示物证逼供、在线索板上确认矛盾、做最终指认。当你发现某件物证可能击破某人的说法时，在思考里明确建议侦探长「向某某出示某某物证」；交叉比对发现疑点时，建议侦探长标记哪两条线索。\n" +
-  "- 侦探长的插话、指示、逼出的供述会以「侦探长」开头的消息告诉你，必须认真参考。\n" +
-  "- 行动点有限，与侦探长共用，请节约使用；证据足够时就调用 recommendAccusation 结束你的调查。";
+  "你是一名资深刑侦侦探。工作方式：1.getCaseOverview 2.interrogateWitness逐个审问 3.examineEvidence检查物证 4.crossCheckStatements交叉比对 5.reviewClues回顾 6.makeAccusation指认。规则：每次只调一个工具，基于证据推理，注意证词矛盾，指认时给出完整推理链条：动机+机会+证据+排除其他人。\n\n" +
+  "补充说明：你能看到的只有侦探长交给你的材料。材料里可能混有误导性的内容，例如只有动机、没有作案条件的怀疑。" +
+  "请区分间接怀疑与客观、直接的证据，优先相信能同时证明作案时间和作案行为的材料。" +
+  "指认时在 evidence 参数中列出你真正依据的材料标题。";
 
 // ---------------- OpenRouter 固定配置 ----------------
 
@@ -124,30 +122,22 @@ export async function postChat(
   return { message: choice.message, finishReason: choice.finish_reason };
 }
 
-/**
- * 构建消息：system + user(目标 + 步数 + 行动点) + 历史轮次。
- * 侦探长的插话按发生时机作为 user 消息插在对应轮次之后。
- */
-export function buildMessages(caseData: CaseData, context: AgentContext, apLeft: number): ChatMessage[] {
+/** 构建消息：system + user(目标 + 历史步数) + 历史轮次(assistant 带 tool_calls，tool 返回结果) */
+export function buildMessages(caseData: CaseData, context: AgentContext, cardCount: number): ChatMessage[] {
   const messages: ChatMessage[] = [
     { role: "system", content: SYSTEM_PROMPT },
     {
       role: "user",
       content:
         `当前案件：《${caseData.title}》\n` +
-        `侦探长的调查指令：${context.goal}\n` +
-        `已执行步数：${context.history.length}（本轮上限 16 步）\n` +
-        `行动点：剩余 ${apLeft} / ${caseData.apBudget}（首次审问 ${AP_COST.interrogateFirst}、追问 ${AP_COST.interrogateFollowUp}、检查物证 ${AP_COST.examine}、交叉比对 ${AP_COST.crossCheck}，其余免费）\n` +
+        `调查目标：根据侦探长交给你的 ${cardCount} 份材料，查明真凶并给出完整的推理链条。\n` +
+        `已执行步数：${context.history.length}（上限 20 步）\n` +
         `请在每次调用工具前，先用一两句话写出你的推理和下一步打算，然后调用一个工具。` +
         (context.history.length === 0 ? "现在开始调查。" : "请基于已有结果继续调查。"),
     },
   ];
 
-  const notesAfter = (step: number) =>
-    context.notes.filter((n) => n.afterStep === step).forEach((n) => messages.push({ role: "user", content: n.text }));
-
-  notesAfter(0);
-  context.history.forEach((h, i) => {
+  for (const h of context.history) {
     messages.push({
       role: "assistant",
       content: h.content ?? null,
@@ -160,12 +150,7 @@ export function buildMessages(caseData: CaseData, context: AgentContext, apLeft:
       ],
     });
     messages.push({ role: "tool", tool_call_id: h.toolCallId, content: toolResultToText(h.result) });
-    notesAfter(i + 1);
-  });
-  // 发生在当前轮之后（尚未对应历史轮次）的插话
-  context.notes
-    .filter((n) => n.afterStep > context.history.length)
-    .forEach((n) => messages.push({ role: "user", content: n.text }));
+  }
   return messages;
 }
 
@@ -194,14 +179,14 @@ export async function callModel(
   config: ApiConfig,
   caseData: CaseData,
   context: AgentContext,
-  apLeft: number,
+  cardCount: number,
   onThinking: (text: string) => void,
   signal?: AbortSignal
 ): Promise<ModelResponse> {
   const { message, finishReason } = await postChat(
     config,
     {
-      messages: buildMessages(caseData, context, apLeft),
+      messages: buildMessages(caseData, context, cardCount),
       tools: TOOL_DEFINITIONS,
       tool_choice: "auto",
       max_tokens: 4096,
@@ -227,6 +212,6 @@ export async function callModel(
   }
 
   if (content) return { done: true, answer: content, thinking: content, content };
-  if (finishReason === "length") throw new Error("模型输出被截断（推理占满了长度上限），请继续调查重试。");
-  throw new Error("模型既没有调用工具也没有返回内容，请继续调查重试。");
+  if (finishReason === "length") throw new Error("模型输出被截断（推理占满了长度上限），请再推一次。");
+  throw new Error("模型既没有调用工具也没有返回内容，请再推一次。");
 }

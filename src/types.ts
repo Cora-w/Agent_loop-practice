@@ -1,48 +1,31 @@
-// ===================== 案件数据 =====================
+// ===================== 案件与卡池 =====================
 
 export interface Suspect {
   id: string;
   name: string;
   role: string;
   info: string;
-  /** 只给扮演该嫌疑人的 AI 看的内心秘密，玩家不可见 */
-  secret: string;
 }
 
-export interface Statement {
-  personId: string;
-  personName: string;
-  content: string;
-}
-
-export interface Evidence {
+/** 一张线索卡：证据（物证、记录）或剧情（证词、背景、人物关系） */
+export interface Card {
   id: string;
-  name: string;
-  content: string;
-}
-
-export interface Contradiction {
-  id: string;
-  involved: string[];
-  finding: string;
-  /** AI 交叉比对时给出的模糊提示（不直接说破） */
-  hint: string;
-  /** 能构成该矛盾的线索对（线索 id：stmt-xxx / ev-xxx），玩家标记任意一对即判定成功 */
-  pairs: [string, string][];
-}
-
-/** 隐藏供述：向指定嫌疑人出示指定物证后解锁 */
-export interface HiddenClue {
-  id: string;
-  suspectId: string;
-  triggerEvidenceId: string;
+  kind: "evidence" | "plot";
   title: string;
   content: string;
+  /** 与哪些嫌疑人相关（审问某人时，会给出与其相关的剧情卡） */
+  suspectIds: string[];
 }
 
-export interface Truth {
-  culprit: string;
-  reasoning: string;
+/**
+ * 每个嫌疑人的一套卡：
+ * - suspicion 嫌疑卡：动机、可疑举动等间接线索。他是凶手时为真线索，不是凶手时为干扰线索。
+ * - proof 定罪卡：作案机会与直接证据。只有他被指定为凶手时才会出现在卡池里。
+ */
+export interface SuspectKit {
+  suspectId: string;
+  suspicion: Card[];
+  proof: Card[];
 }
 
 export interface CaseData {
@@ -55,14 +38,25 @@ export interface CaseData {
   time: string;
   location: string;
   suspects: Suspect[];
-  statements: Statement[];
-  evidence: Evidence[];
-  contradictions: Contradiction[];
-  hiddenClues: HiddenClue[];
-  truth: Truth;
-  goal: string;
-  /** 行动点预算（AI 与玩家共用） */
-  apBudget: number;
+  /** 不论谁是凶手都成立的中性材料（案情事实、各人最初的证词） */
+  neutralCards: Card[];
+  kits: SuspectKit[];
+}
+
+/** 卡片在当前设局中的性质（只有出题人能看到） */
+export type CardRole = "true" | "decoy" | "neutral";
+
+export interface PoolCard {
+  card: Card;
+  role: CardRole;
+  custom?: boolean;
+}
+
+/** 出题人的设局：指定凶手 + 交给 AI 的卡 */
+export interface Puzzle {
+  caseId: string;
+  culpritId: string;
+  cards: PoolCard[];
 }
 
 // ===================== Agent 运行时 =====================
@@ -72,25 +66,17 @@ export interface Action {
   input: Record<string, string>;
 }
 
-export interface ClueItem {
-  id: string;
-  type: "statement" | "evidence" | "confession" | "contradiction";
-  title: string;
-  snippet: string;
-}
-
 export interface ToolResult {
   success: boolean;
   result?: string;
   error?: string;
-  /** recommendAccusation：AI 的调查结束，等待侦探长指认 */
   isFinalAction?: boolean;
   accused?: string;
   reasoning?: string;
-  /** 本次消耗的行动点 */
-  apCost?: number;
-  /** 本次工具调用新产生的线索（用于线索板自动收集） */
-  clues?: ClueItem[];
+  /** AI 指认时引用的卡片 id */
+  citedIds?: string[];
+  /** 本次 AI 新查看的卡片 id */
+  viewedIds?: string[];
 }
 
 export interface TimelineStep {
@@ -100,33 +86,10 @@ export interface TimelineStep {
   result?: ToolResult;
 }
 
-/** 侦探长（玩家）的行动 */
-export interface PlayerEvent {
-  kind: "ask" | "present" | "mark" | "order";
-  suspectName?: string;
-  question?: string;
-  evidenceName?: string;
-  reply?: string;
-  pending?: boolean;
-  /** 出示物证逼出的隐藏供述 / 标记成功的矛盾 */
-  unlocked?: ClueItem;
-  ok?: boolean;
-  text?: string;
-  apCost?: number;
-  error?: string;
-}
-
-export type TimelineItem =
-  | { id: string; kind: "agent"; step: TimelineStep }
-  | { id: string; kind: "player"; event: PlayerEvent };
-
 export type LoopPhase = "observe" | "decide" | "act" | "evaluate" | null;
 
-/**
- * idle 未开始 / running AI 推进中 / paused 暂停 /
- * ready AI 已停止，等待侦探长指认或继续 / success 已指认结案 / error 出错
- */
-export type AgentStatus = "idle" | "running" | "paused" | "ready" | "success" | "error";
+/** idle 未开始 / running 推理中 / judging 评审中 / success 已出结果 / error 出错或中止 */
+export type AgentStatus = "idle" | "running" | "judging" | "success" | "error";
 
 // ===================== 配置 & 模型 =====================
 
@@ -135,27 +98,17 @@ export interface ApiConfig {
   apiKey: string;
 }
 
-/** 已完成的一轮：assistant 发起 tool_call，tool 返回结果 */
 export interface HistoryEntry {
   step: number;
   thinking?: string;
-  /** assistant 消息原文（回传给模型用；thinking 可能是推理摘要） */
   content?: string;
   action: Action;
   toolCallId: string;
   result: ToolResult;
 }
 
-/** 侦探长的插话，在第 afterStep 轮之后作为 user 消息插入上下文 */
-export interface AgentNote {
-  afterStep: number;
-  text: string;
-}
-
 export interface AgentContext {
-  goal: string;
   history: HistoryEntry[];
-  notes: AgentNote[];
 }
 
 export interface ModelResponse {
@@ -168,26 +121,37 @@ export interface ModelResponse {
 }
 
 export interface LoopOutcome {
-  reason: "recommend" | "done" | "ap" | "maxSteps";
+  reason: "accused" | "done" | "maxSteps";
   steps: number;
   finalResult?: ToolResult;
   answer?: string;
 }
 
-export interface ScoreLine {
-  label: string;
-  points: number;
-  max: number;
+// ===================== 判定 =====================
+
+export interface ReasoningScore {
+  motive: number; // 0-25
+  opportunity: number;
+  evidence: number;
+  exclusion: number;
+  total: number; // 0-100
+  comment: string;
+  failed?: boolean;
 }
 
-export interface Verdict {
-  accused: string;
+export interface Judgement {
+  /** AI 是否给出了指认 */
+  accused: string | null;
   reasoning: string;
   correct: boolean;
-  judgeComment: string;
-  breakdown: ScoreLine[];
-  total: number;
-  grade: "S" | "A" | "B" | "C" | "D";
+  culprit: string;
+  /** 引用的卡片按性质分类 */
+  citedTrue: PoolCard[];
+  citedDecoy: PoolCard[];
+  citedNeutral: PoolCard[];
+  /** 交给了 AI 但没被引用的真线索 */
+  missedTrue: PoolCard[];
+  score: ReasoningScore | null;
 }
 
-export type Page = "home" | "investigate";
+export type Page = "home" | "setup" | "investigate";

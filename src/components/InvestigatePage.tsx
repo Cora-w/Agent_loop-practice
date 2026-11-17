@@ -1,17 +1,15 @@
-import { useState } from "react";
-import type { AgentStatus, ApiConfig, CaseData } from "../types";
+import { useEffect } from "react";
+import type { AgentStatus, ApiConfig, CaseData, Puzzle } from "../types";
 import { useAgentLoop } from "../hooks/useAgentLoop";
 import { MODEL_LABEL, isConfigReady } from "../lib/model";
 import CasePanel from "./CasePanel";
-import InstructionInput from "./InstructionInput";
 import LoopIndicator from "./LoopIndicator";
 import Timeline from "./Timeline";
-import InterrogationBar from "./InterrogationBar";
 import ClueBoard from "./ClueBoard";
-import AccusationModal from "./AccusationModal";
 
 interface Props {
   caseData: CaseData;
+  puzzle: Puzzle;
   apiConfig: ApiConfig;
   onBack: () => void;
   onOpenApi: (hint?: string) => void;
@@ -19,85 +17,52 @@ interface Props {
 
 const STATUS_TEXT: Record<AgentStatus, string> = {
   idle: "待命",
-  running: "调查中",
-  paused: "已暂停",
-  ready: "等待指认",
-  success: "已结案",
+  running: "推理中",
+  judging: "评审中",
+  success: "已出结果",
   error: "已中断",
 };
 
-export default function InvestigatePage({ caseData, apiConfig, onBack, onOpenApi }: Props) {
-  const game = useAgentLoop(caseData, apiConfig);
-  const [instruction, setInstruction] = useState("");
-  const [selectedSuspect, setSelectedSuspect] = useState(caseData.suspects[0].id);
-  const [accuseOpen, setAccuseOpen] = useState(false);
+export default function InvestigatePage({ caseData, puzzle, apiConfig, onBack, onOpenApi }: Props) {
+  const game = useAgentLoop(caseData, puzzle, apiConfig);
+  const { status } = game;
+  const busy = status === "running" || status === "judging";
+  const culprit = caseData.suspects.find((s) => s.id === puzzle.culpritId);
 
-  const { status, memory } = game;
-  const ready = isConfigReady(apiConfig);
-  const started = status !== "idle";
-  const finished = status === "success";
-  const loopActive = status === "running" || status === "paused";
+  // 进入页面即开始推理
+  useEffect(() => {
+    if (isConfigReady(apiConfig)) void game.start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const requireApi = () => {
-    if (ready) return true;
-    onOpenApi("开始调查前，请先填写 OpenRouter API Key。");
-    return false;
-  };
-
-  const handlePrimary = () => {
-    if (status === "idle") {
-      if (!requireApi()) return;
-      game.start(instruction.trim() || caseData.goal);
-      setInstruction("");
-    } else if (loopActive) {
-      game.sendOrder(instruction);
-      setInstruction("");
-    } else if (status === "ready" || status === "error") {
-      if (!requireApi()) return;
-      game.continueInvestigation(instruction);
-      setInstruction("");
-    } else if (finished) {
-      game.restart();
+  const rerun = () => {
+    if (!isConfigReady(apiConfig)) {
+      onOpenApi("请先填写 OpenRouter API Key。");
+      return;
     }
+    void game.start();
   };
-
-  const handleBack = () => {
-    game.reset();
-    onBack();
-  };
-
-  const apRatio = memory.ap / caseData.apBudget;
 
   return (
     <div className="investigate">
       <header className="inv-header">
-        <button className="btn btn-ghost back-btn" onClick={handleBack}>
-          返回案件
+        <button className="btn btn-ghost back-btn" onClick={onBack}>
+          修改设局
         </button>
         <div className="inv-title">
           <span className="inv-title-icon">{caseData.icon}</span>
           <h1>{caseData.title}</h1>
-          <span className="inv-difficulty">{caseData.difficulty}</span>
+          <span className="inv-difficulty">AI 推理</span>
         </div>
         <div className="inv-header-right">
-          <div className={`ap-meter ${apRatio <= 0.2 ? "is-low" : ""}`} title="行动点：AI 与侦探长共用">
-            <span className="ap-label">行动点</span>
-            <span className="ap-track">
-              <i style={{ width: `${Math.max(0, apRatio) * 100}%` }} />
-            </span>
-            <span className="ap-value">
-              {memory.ap}
-              <em>/{caseData.apBudget}</em>
-            </span>
-          </div>
-          {started && <span className="mode-tag">{MODEL_LABEL}</span>}
+          <span className="mode-tag">{MODEL_LABEL}</span>
           <div className={`status-indicator status-${status}`}>
             <span className="status-dot" />
             <span>{STATUS_TEXT[status]}</span>
             {game.currentStep > 0 && <span className="status-step">STEP {game.currentStep}</span>}
           </div>
         </div>
-        {status === "running" && (
+        {busy && (
           <div className="inv-progress" aria-hidden="true">
             <span />
           </div>
@@ -106,82 +71,67 @@ export default function InvestigatePage({ caseData, apiConfig, onBack, onOpenApi
 
       <div className="inv-grid">
         <aside className="inv-col inv-left">
-          <CasePanel
-            caseData={caseData}
-            accused={game.verdict?.accused ?? null}
-            selected={selectedSuspect}
-            onSelect={setSelectedSuspect}
-            interrogated={memory.interrogated}
-            unlocked={memory.unlocked}
-            selectable={started && !finished}
-          />
+          <CasePanel caseData={caseData} culprit={culprit?.name ?? ""} accused={game.judgement?.accused ?? null} />
         </aside>
 
         <main className="inv-col inv-center">
-          <InstructionInput
-            value={instruction}
-            onChange={setInstruction}
-            status={status}
-            onPrimary={handlePrimary}
-            onTogglePause={status === "paused" ? game.resume : game.pause}
-            onAccuse={() => setAccuseOpen(true)}
-            canAccuse={started && !finished && !game.judging}
-            apiReady={ready}
-            onOpenApi={() => onOpenApi()}
-          />
+          <section className="run-bar">
+            <div>
+              <h2 className="instruction-title">
+                你设定的凶手是 <strong>{culprit?.name}</strong>，交给 AI {puzzle.cards.length} 张卡
+              </h2>
+              <p className="instruction-hint">
+                {status === "running"
+                  ? "AI 只能看到你给的卡，正在一步步翻看、比对、排除。"
+                  : status === "judging"
+                    ? "AI 已经指认，评审正在给它的推理链打分。"
+                    : status === "success"
+                      ? "结果出来了。可以让 AI 再推一次，或者回去修改设局。"
+                      : status === "error"
+                        ? "推理中断了。可以再推一次。"
+                        : "准备开始。"}
+              </p>
+            </div>
+            <div className="run-actions">
+              {busy ? (
+                <button className="btn btn-outline" onClick={game.stop}>
+                  停止
+                </button>
+              ) : (
+                <button className="btn btn-primary" onClick={rerun}>
+                  {status === "idle" ? "开始推理" : "再推一次"}
+                </button>
+              )}
+              <button className="btn btn-ghost" onClick={onBack} disabled={busy}>
+                修改设局
+              </button>
+            </div>
+          </section>
           <LoopIndicator
             phase={game.phase}
             step={game.currentStep}
             running={status === "running"}
-            paused={status === "paused"}
-            completed={status === "ready" || finished}
+            completed={status === "success" || status === "judging"}
           />
           <Timeline
             caseData={caseData}
-            items={game.items}
+            puzzle={puzzle}
+            steps={game.steps}
             status={status}
-            goal={game.goal}
-            verdict={game.verdict}
-            recommendation={game.recommendation}
-            stopNote={game.stopNote}
+            judgement={game.judgement}
             error={game.error}
-          />
-          <InterrogationBar
-            caseData={caseData}
-            selected={selectedSuspect}
-            onSelect={setSelectedSuspect}
-            examined={memory.examined}
-            ap={memory.ap}
-            disabled={!started || finished}
-            closed={finished}
-            busy={game.playerBusy}
-            onSubmit={game.interrogate}
           />
         </main>
 
         <aside className="inv-col inv-right">
           <ClueBoard
-            clues={game.clues}
-            canMark={started && !finished}
-            markedCount={memory.marked.length}
-            totalContradictions={caseData.contradictions.length}
-            onMark={game.markContradiction}
+            cards={puzzle.cards}
+            viewedIds={game.viewedIds}
+            citedIds={game.citedIds}
+            revealed={status === "success"}
           />
         </aside>
       </div>
-
-      {accuseOpen && (
-        <AccusationModal
-          caseData={caseData}
-          recommendation={game.recommendation}
-          judging={game.judging}
-          onClose={() => setAccuseOpen(false)}
-          onSubmit={async (name, reasoning) => {
-            const res = await game.accuse(name, reasoning);
-            if (res.ok) setAccuseOpen(false);
-          }}
-        />
-      )}
     </div>
   );
 }

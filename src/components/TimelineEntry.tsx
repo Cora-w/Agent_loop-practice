@@ -122,8 +122,8 @@ export default function TimelineEntry({ step, isLatest, running }: Props) {
           <div className={`tl-result ${result.success ? "is-ok" : "is-fail"}`}>
             <div className="tl-result-head">
               <span className="tl-tag">{result.success ? "RESULT" : "ERROR"}</span>
-              {result.clues && result.clues.length > 0 && (
-                <span className="tl-clue-note">+{result.clues.length} 条线索</span>
+              {result.viewedIds && result.viewedIds.length > 0 && (
+                <span className="tl-clue-note">新查看 {result.viewedIds.length} 张卡</span>
               )}
             </div>
             <pre className="tl-result-text">{shownText}</pre>

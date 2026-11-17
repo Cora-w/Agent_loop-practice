@@ -1,122 +1,61 @@
 import { useState } from "react";
-import type { ClueItem } from "../types";
-import type { ActionFeedback } from "../hooks/useAgentLoop";
+import type { PoolCard } from "../types";
+import { KIND_LABEL, ROLE_LABEL } from "../lib/pool";
 
 interface Props {
-  clues: ClueItem[];
-  canMark: boolean;
-  markedCount: number;
-  totalContradictions: number;
-  onMark: (a: string, b: string) => ActionFeedback;
+  cards: PoolCard[];
+  viewedIds: string[];
+  citedIds: string[];
+  /** 出结果后显示「被引用」标记 */
+  revealed: boolean;
 }
 
-const TYPE_LABEL: Record<ClueItem["type"], string> = {
-  statement: "证词",
-  evidence: "物证",
-  confession: "供述",
-  contradiction: "矛盾",
-};
-
-const markable = (c: ClueItem) => c.type === "statement" || c.type === "evidence";
-
-export default function ClueBoard({ clues, canMark, markedCount, totalContradictions, onMark }: Props) {
+/** 右栏：交给 AI 的卡片，实时显示 AI 查看了哪些 */
+export default function ClueBoard({ cards, viewedIds, citedIds, revealed }: Props) {
   const [openId, setOpenId] = useState<string | null>(null);
-  const [marking, setMarking] = useState(false);
-  const [picked, setPicked] = useState<string[]>([]);
-  const [feedback, setFeedback] = useState<ActionFeedback | null>(null);
-
-  const count = (t: ClueItem["type"]) => clues.filter((c) => c.type === t).length;
-  const markableCount = clues.filter(markable).length;
-
-  const toggleMarking = () => {
-    setMarking((m) => !m);
-    setPicked([]);
-    setFeedback(null);
-  };
-
-  const onCardClick = (c: ClueItem) => {
-    if (marking && markable(c)) {
-      setPicked((p) => (p.includes(c.id) ? p.filter((x) => x !== c.id) : p.length >= 2 ? [p[1], c.id] : [...p, c.id]));
-      return;
-    }
-    setOpenId(openId === c.id ? null : c.id);
-  };
-
-  const confirm = () => {
-    if (picked.length !== 2) return;
-    const res = onMark(picked[0], picked[1]);
-    setFeedback(res);
-    setPicked([]);
-    if (res.ok) setMarking(false);
-  };
+  const viewed = cards.filter((pc) => viewedIds.includes(pc.card.id)).length;
 
   return (
     <div className="clue-board">
       <div className="clue-head">
-        <h2 className="clue-title">线索板</h2>
-        <span className="clue-count">{clues.length}</span>
+        <h2 className="clue-title">交给 AI 的卡片</h2>
+        <span className="clue-count">
+          {viewed}
+          <em>/{cards.length}</em>
+        </span>
       </div>
-
       <div className="clue-legend">
-        {(Object.keys(TYPE_LABEL) as ClueItem["type"][]).map((t) => (
-          <span key={t} className={`legend-item legend-${t}`}>
-            <span className="legend-dot" />
-            {TYPE_LABEL[t]} {count(t)}
-          </span>
-        ))}
+        <span className="legend-item">AI 已查看 {viewed} 张</span>
+        {revealed && <span className="legend-item">被引用 {citedIds.length} 张</span>}
       </div>
 
-      <div className="mark-panel">
-        <div className="mark-stat">
-          已确认矛盾 <strong>{markedCount}</strong> / {totalContradictions}
-        </div>
-        <button
-          className={`btn btn-outline mark-toggle ${marking ? "is-on" : ""}`}
-          onClick={toggleMarking}
-          disabled={!canMark || markableCount < 2}
-        >
-          {marking ? "取消标记" : "标记矛盾"}
-        </button>
-        {marking && (
-          <div className="mark-hint">
-            选出两条互相冲突的证词或物证（{picked.length}/2）。标错扣 1 行动点。
-            <button className="btn btn-primary mark-confirm" disabled={picked.length !== 2} onClick={confirm}>
-              确认标记
-            </button>
-          </div>
-        )}
-        {feedback && <div className={`mark-feedback ${feedback.ok ? "is-ok" : "is-bad"}`}>{feedback.message}</div>}
-      </div>
-
-      {clues.length === 0 ? (
-        <div className="clue-empty">
-          <p>证词、物证、逼出的供述和你确认的矛盾，都会出现在这里。</p>
-        </div>
-      ) : (
-        <ul className="clue-list">
-          {clues.map((c) => {
-            const open = openId === c.id;
-            const isPicked = picked.includes(c.id);
-            const dim = marking && !markable(c);
-            return (
-              <li
-                key={c.id}
-                className={`clue-card clue-${c.type} ${open ? "is-open" : ""} ${isPicked ? "is-picked" : ""} ${
-                  dim ? "is-dim" : ""
-                } ${marking && markable(c) ? "is-pickable" : ""}`}
-                onClick={() => onCardClick(c)}
-              >
-                <div className="clue-card-head">
-                  {marking && markable(c) && <span className="pick-box" aria-hidden="true" />}
-                  <span className="clue-type">{TYPE_LABEL[c.type]}</span>
-                  <span className="clue-card-title">{c.title}</span>
-                </div>
-                <p className="clue-snippet">{c.snippet}</p>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+      <ul className="clue-list">
+        {cards.map((pc) => {
+          const seen = viewedIds.includes(pc.card.id);
+          const cited = revealed && citedIds.includes(pc.card.id);
+          const open = openId === pc.card.id;
+          return (
+            <li
+              key={pc.card.id}
+              className={`clue-card role-${pc.role} ${seen ? "is-seen" : "is-unseen"} ${cited ? "is-cited" : ""} ${
+                open ? "is-open" : ""
+              }`}
+              onClick={() => setOpenId(open ? null : pc.card.id)}
+            >
+              <div className="clue-card-head">
+                <span className={`role-tag role-tag-${pc.role}`}>{ROLE_LABEL[pc.role]}</span>
+                <span className="clue-card-title">{pc.card.title}</span>
+              </div>
+              <p className="clue-snippet">{pc.card.content}</p>
+              <div className="clue-state">
+                <span>{KIND_LABEL[pc.card.kind]}</span>
+                <span className={seen ? "is-on" : ""}>{seen ? "AI 已查看" : "未查看"}</span>
+                {cited && <span className="is-on">被 AI 引用</span>}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }
