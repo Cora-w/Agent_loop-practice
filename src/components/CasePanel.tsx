@@ -46,7 +46,7 @@ export default function CasePanel({ caseData, culprit, accused }: Props) {
                 <div className="suspect-body">
                   <div className="suspect-name-row">
                     <span className="suspect-name">{s.name}</span>
-                    {isCulprit && <span className="culprit-tag">你设定的凶手</span>}
+                    {isCulprit && <span className="culprit-tag">你定下的真凶</span>}
                     {isAccused && <span className="accused-tag">AI 指认</span>}
                   </div>
                   <div className="suspect-role">{s.role}</div>

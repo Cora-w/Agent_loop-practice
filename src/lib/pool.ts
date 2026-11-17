@@ -1,8 +1,8 @@
 import type { CaseData, CardRole, PoolCard } from "../types";
 
 export const ROLE_LABEL: Record<CardRole, string> = {
-  true: "真线索",
-  decoy: "干扰",
+  true: "实线索",
+  decoy: "虚线索",
   neutral: "中性",
 };
 

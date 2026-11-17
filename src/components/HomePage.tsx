@@ -26,13 +26,14 @@ export default function HomePage({ apiConfig, onSelectCase, onOpenApi }: Props) 
       </header>
 
       <section className="hero">
-        <p className="hero-kicker">出题人模式 · AGENT LOOP</p>
+        <p className="hero-kicker">TRUE OR FALSE</p>
         <h1 className="hero-title">
-          设局<span className="hero-title-accent">考 AI 侦探</span>
+          虚<span className="hero-title-accent">实</span>
         </h1>
         <p className="hero-desc">
-          你来出题：指定一个凶手，从卡池里挑选证据和剧情交给 AI，还可以故意混进干扰线索。
-          AI 侦探按「观察、决策、行动、评估」的循环一步步推理并指认凶手，看它能不能识破你设的局。
+          线索有虚有实，虚实由你来定。
+          <br />
+          它只能在你给的虚实之间，找到那唯一的实。
         </p>
       </section>
 

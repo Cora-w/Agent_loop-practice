@@ -29,8 +29,8 @@ export default function VerdictCard({ puzzle, judgement: j }: Props) {
   const trueGiven = puzzle.cards.filter((pc) => pc.role === "true").length;
   const decoyGiven = puzzle.cards.filter((pc) => pc.role === "decoy").length;
 
-  const headline = !j.accused ? "AI 没能指认" : j.correct ? "AI 推理正确" : "AI 被误导了";
-  const sub = !j.accused || !j.correct ? "你设的局成功了" : "你设的局被识破了";
+  const headline = !j.accused ? "虚实难辨" : j.correct ? "去虚存实" : "以虚为实";
+  const sub = !j.accused ? "AI 没能说出一个名字" : j.correct ? "AI 识破了你布下的虚" : "AI 把虚当成了实";
   const score = j.score;
   const dims: [string, number][] = score
     ? [
@@ -59,7 +59,7 @@ export default function VerdictCard({ puzzle, judgement: j }: Props) {
       {/* 1. 凶手是否选对 */}
       <div className="verdict-compare">
         <div>
-          <span className="verdict-label">你设定的凶手</span>
+          <span className="verdict-label">你定下的真凶</span>
           <span className="verdict-name">{j.culprit}</span>
         </div>
         <div>
@@ -71,16 +71,16 @@ export default function VerdictCard({ puzzle, judgement: j }: Props) {
       {/* 2. 证据是否用对 */}
       <div className="verdict-section">
         <div className="verdict-label">
-          证据使用 · 真线索用到 {j.citedTrue.length}/{trueGiven}，干扰卡引用 {j.citedDecoy.length}/{decoyGiven}
+          证据使用 · 实线索用到 {j.citedTrue.length}/{trueGiven}，虚线索引用 {j.citedDecoy.length}/{decoyGiven}
         </div>
         <div className="use-grid">
-          <CardList label="用对的真线索" cards={j.citedTrue} empty="没有引用任何真线索" />
+          <CardList label="用对的实线索" cards={j.citedTrue} empty="没有用上任何实线索" />
           <CardList
-            label={j.correct ? "提到的干扰卡（已识破）" : "被干扰卡带偏"}
+            label={j.correct ? "提到的虚线索（已识破）" : "被虚线索带偏"}
             cards={j.citedDecoy}
-            empty={j.correct ? "没有提到干扰卡" : "没有引用干扰卡"}
+            empty={j.correct ? "没有提到虚线索" : "没有引用虚线索"}
           />
-          <CardList label="漏掉的真线索" cards={j.missedTrue} empty="真线索全部用上了" />
+          <CardList label="漏掉的实线索" cards={j.missedTrue} empty="实线索全部用上了" />
           <CardList label="引用的中性材料" cards={j.citedNeutral} empty="—" />
         </div>
       </div>

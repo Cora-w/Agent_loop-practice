@@ -48,12 +48,12 @@ export default function CaseCard({ caseData, index, onClick }: Props) {
         <div className="case-meta-item">
           <span className="meta-label">嫌疑人</span>
           <span className="meta-value">
-            {caseData.suspects.length} 人 · 每种设局卡池 {poolSize(caseData)} 张
+            {caseData.suspects.length} 人 · 卡池 {poolSize(caseData)} 张
           </span>
         </div>
       </div>
 
-      <span className="case-enter">开始出题</span>
+      <span className="case-enter">开始布局</span>
     </button>
   );
 }

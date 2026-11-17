@@ -78,10 +78,10 @@ export default function SetupPage({ caseData, initial, apiConfig, onBack, onStar
 
   const warnings: string[] = [];
   if (culpritId && hand.length > 0 && count("true", hand) === 0) {
-    warnings.push("手牌里没有任何真线索，AI 几乎不可能推出你设定的凶手。");
+    warnings.push("手牌里一张实线索都没有，AI 几乎不可能找到真凶。");
   }
   if (count("decoy", hand) > count("true", hand) && count("true", hand) > 0) {
-    warnings.push("干扰卡比真线索还多，这是一个很难的局。");
+    warnings.push("虚多于实，这是一个很难的局。");
   }
 
   const canStart = !!culpritId && hand.length >= MIN_CARDS && hand.length <= MAX_CARDS;
@@ -104,12 +104,12 @@ export default function SetupPage({ caseData, initial, apiConfig, onBack, onStar
         <div className="inv-title">
           <span className="inv-title-icon">{caseData.icon}</span>
           <h1>{caseData.title}</h1>
-          <span className="inv-difficulty">出题</span>
+          <span className="inv-difficulty">布局</span>
         </div>
         <div className="inv-header-right">
           <span className="setup-steps">
-            <span className={culpritId ? "is-done" : "is-active"}>01 指定凶手</span>
-            <span className={!culpritId ? "" : hand.length >= MIN_CARDS ? "is-done" : "is-active"}>02 挑选卡片</span>
+            <span className={culpritId ? "is-done" : "is-active"}>01 定下真凶</span>
+            <span className={!culpritId ? "" : hand.length >= MIN_CARDS ? "is-done" : "is-active"}>02 布置虚实</span>
             <span className={canStart ? "is-active" : ""}>03 交给 AI</span>
           </span>
         </div>
@@ -135,7 +135,7 @@ export default function SetupPage({ caseData, initial, apiConfig, onBack, onStar
           </div>
           <div className="panel-block">
             <div className="panel-label">
-              01 指定凶手 <span className="panel-tip">只有你知道</span>
+              01 定下真凶 <span className="panel-tip">只有你知道</span>
             </div>
             <ul className="suspect-list">
               {caseData.suspects.map((s) => (
@@ -166,28 +166,28 @@ export default function SetupPage({ caseData, initial, apiConfig, onBack, onStar
           {!culpritId ? (
             <div className="timeline-empty">
               <div className="empty-lens" aria-hidden="true" />
-              <p className="empty-title">先在左边指定一个凶手</p>
+              <p className="empty-title">先在左边定下真凶</p>
               <p className="empty-sub">
-                系统会按你指定的凶手生成卡池：指向凶手的真线索、指向其他人的干扰线索，以及中性材料。
+                实，是指向真凶的线索；虚，是落在旁人身上的疑云。
                 <br />
-                你从中挑选交给 AI，看它能不能识破你设的局。
+                给它多少实、掺多少虚，由你决定。
               </p>
             </div>
           ) : (
             <>
               <section className="pool-head">
                 <div>
-                  <h2 className="instruction-title">02 挑选交给 AI 的卡片</h2>
+                  <h2 className="instruction-title">02 布置虚实</h2>
                   <p className="instruction-hint">
-                    AI 看不到卡片的真假标记。你可以故意混入干扰卡，考验它的判断。
+                    AI 看不到哪张是虚、哪张是实，它只能自己分辨。
                   </p>
                 </div>
                 <div className="pool-actions">
                   <button className="chip" onClick={pickTrue}>
-                    加入全部真线索
+                    加入全部实线索
                   </button>
                   <button className="chip" onClick={pickDecoys}>
-                    随机加 2 张干扰
+                    随机加 2 张虚线索
                   </button>
                   <button className="chip" onClick={pickStatements}>
                     加入全部证词
@@ -269,11 +269,11 @@ export default function SetupPage({ caseData, initial, apiConfig, onBack, onStar
             <div className="clue-legend">
               <span className="legend-item legend-true">
                 <span className="legend-dot" />
-                真线索 {count("true", hand)}
+                实 {count("true", hand)}
               </span>
               <span className="legend-item legend-decoy">
                 <span className="legend-dot" />
-                干扰 {count("decoy", hand)}
+                虚 {count("decoy", hand)}
               </span>
               <span className="legend-item legend-neutral">
                 <span className="legend-dot" />
@@ -310,10 +310,10 @@ export default function SetupPage({ caseData, initial, apiConfig, onBack, onStar
             </button>
             <p className="setup-note">
               {!culpritId
-                ? "先指定凶手。"
+                ? "先定下真凶。"
                 : hand.length < MIN_CARDS
                   ? `还差 ${MIN_CARDS - hand.length} 张卡。`
-                  : "AI 会按「观察、决策、行动、评估」逐步推理，最后指认凶手。"}
+                  : "AI 会按「观察、决策、行动、评估」逐步推理，最后说出一个名字。"}
             </p>
           </div>
         </aside>
@@ -393,7 +393,7 @@ function CustomCardForm({ caseData, onAdd }: { caseData: CaseData; onAdd: (card:
           加入卡池
         </button>
       </div>
-      <p className="setup-note">「真线索 / 干扰 / 中性」只用于判定 AI 是否用对证据，AI 看不到。</p>
+      <p className="setup-note">「实 / 虚 / 中性」只用于判定 AI 是否用对证据，AI 看不到。</p>
     </section>
   );
 }

@@ -47,12 +47,12 @@ export default function InvestigatePage({ caseData, puzzle, apiConfig, onBack, o
     <div className="investigate">
       <header className="inv-header">
         <button className="btn btn-ghost back-btn" onClick={onBack}>
-          修改设局
+          修改布局
         </button>
         <div className="inv-title">
           <span className="inv-title-icon">{caseData.icon}</span>
           <h1>{caseData.title}</h1>
-          <span className="inv-difficulty">AI 推理</span>
+          <span className="inv-difficulty">辨虚实</span>
         </div>
         <div className="inv-header-right">
           <span className="mode-tag">{MODEL_LABEL}</span>
@@ -78,15 +78,15 @@ export default function InvestigatePage({ caseData, puzzle, apiConfig, onBack, o
           <section className="run-bar">
             <div>
               <h2 className="instruction-title">
-                你设定的凶手是 <strong>{culprit?.name}</strong>，交给 AI {puzzle.cards.length} 张卡
+                你定下的真凶是 <strong>{culprit?.name}</strong>，交给 AI {puzzle.cards.length} 张卡
               </h2>
               <p className="instruction-hint">
                 {status === "running"
-                  ? "AI 只能看到你给的卡，正在一步步翻看、比对、排除。"
+                  ? "AI 只能看到你给的卡，正在一张张分辨虚实。"
                   : status === "judging"
                     ? "AI 已经指认，评审正在给它的推理链打分。"
                     : status === "success"
-                      ? "结果出来了。可以让 AI 再推一次，或者回去修改设局。"
+                      ? "结果出来了。可以让 AI 再推一次，或者回去重新布置虚实。"
                       : status === "error"
                         ? "推理中断了。可以再推一次。"
                         : "准备开始。"}
@@ -103,7 +103,7 @@ export default function InvestigatePage({ caseData, puzzle, apiConfig, onBack, o
                 </button>
               )}
               <button className="btn btn-ghost" onClick={onBack} disabled={busy}>
-                修改设局
+                修改布局
               </button>
             </div>
           </section>
